@@ -250,8 +250,10 @@ while True:
         storeDict('7.Rect', frame2)
 
 # 面積最大領域に重複する領域を併合して外枠拡張 (ひとつになるはずの領域が分割されたケースを救済)
-        MinX1, MaxX1, MinY1, MaxY1 = MinX-M_MARGIN, MaxX+M_MARGIN, MinY-M_MARGIN, MaxY+M_MARGIN
+        # 元のサイズからスタート
         MinX2, MaxX2, MinY2, MaxY2 = MinX, MaxX, MinY, MaxY
+        # 元の領域にマージンを付けて拡張、多少の隙間があっても重複と判断
+        MinX1, MaxX1, MinY1, MaxY1 = MinX-M_MARGIN, MaxX+M_MARGIN, MinY-M_MARGIN, MaxY+M_MARGIN
         for i in range(1, nArea):
             x, y, w, h, size = stats[i]
             if size == -1:
