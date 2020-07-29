@@ -26,6 +26,8 @@ MIN_VALID_AREA_SIZE = 1500
 MAX_NAREA = 50
 # 検出領域の面積合計が下記以下になったら検知完了と判断(軟らかい物体対応)
 MIN_AREA_SIZE = 500
+# マージ時のマージン (領域を広げて接触判定)
+M_MARGIN = 3
 # (定数) ------------------------------------------------------------
 
 # 出力画像データを保管しておく辞書型変数
@@ -248,6 +250,7 @@ while True:
         storeDict('7.Rect', frame2)
 
 # 面積最大領域に重複する領域を併合して外枠拡張 (ひとつになるはずの領域が分割されたケースを救済)
+        MinX1, MaxX1, MinY1, MaxY1 = MinX-M_MARGIN, MaxX+M_MARGIN, MinY-M_MARGIN, MaxY+M_MARGIN
         MinX2, MaxX2, MinY2, MaxY2 = MinX, MaxX, MinY, MaxY
         for i in range(1, nArea):
             x, y, w, h, size = stats[i]
@@ -255,23 +258,23 @@ while True:
                 frame3 = cv2.rectangle(frame3, (x, y), (x+w, y+h),
                                        (0, 0, 255), 1)  # 赤描画 GS値で除去
             else:
-                if (MinX <= x) & (x <= MaxX) & (MinY <= y) & (y <= MaxY):
+                if (MinX1 <= x) & (x <= MaxX1) & (MinY1 <= y) & (y <= MaxY1):
                     if MaxX2 < x+w:
                         MaxX2 = x+w
                     if MaxY2 < y+h:
                         MaxY2 = y+h
-                if (MinX <= x+h) & (x+h <= MaxX) & (MinY <= y) & (y <= MaxY):
+                if (MinX1 <= x+h) & (x+h <= MaxX1) & (MinY1 <= y) & (y <= MaxY1):
                     if x < MinX2:
                         MinX2 = x
                     if MaxY2 < y+h:
                         MaxY2 = y+h
-                if (MinX <= x) & (x <= MaxX) & (MinY <= y+h) & (y+h <= MaxY):
+                if (MinX1 <= x) & (x <= MaxX1) & (MinY1 <= y+h) & (y+h <= MaxY1):
                     if MaxX2 < x+w:
                         MaxX2 = x+w
                     if y < MinY2:
                         MinY2 = y
-                if (MinX <= x+w) & (x+w <= MaxX) & \
-                   (MinY <= y+h) & (y+h <= MaxY):
+                if (MinX1 <= x+w) & (x+w <= MaxX1) & \
+                   (MinY1 <= y+h) & (y+h <= MaxY1):
                     if x < MinX2:
                         MinX2 = x
                     if y < MinY2:
