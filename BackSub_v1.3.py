@@ -27,7 +27,7 @@ MAX_NAREA = 50
 # 検出領域の面積合計が下記以下になったら検知完了と判断(軟らかい物体対応)
 MIN_AREA_SIZE = 500
 # マージ時のマージン (領域を広げて接触判定)
-M_MARGIN = 3
+M_MARGIN = 10
 # (定数) ------------------------------------------------------------
 
 # 出力画像データを保管しておく辞書型変数
@@ -38,14 +38,12 @@ outCt = 0
 # dict0からdict1へのコピーを指示するワンショットフラグ
 dictHoldFlag = False  # 最大枠が更新される度にTrueになる
 
-# ファイルに出力するか否かを決めるフラグ、mp4読み込み時はTrue
-dictFileDumpFlag = True  # Trueになったら1回分の物体検出経過を一式出力
-# 外部読み込みファイル名、スタート時は空欄
-vfile = ''
+# ファイル出力を行うか否かを決めるフラグ、's'または'f'でダンプ開始
+dictFileDumpFlag = False  # Trueになったら中間画像ファイルをダンプ
 
 
-# sキー入力で記録
-def storeDict(name, img):  # 出力画像を辞書変数に保存
+# sキー入力で中間画像を記録
+def storeDict(name, img):  # 画像を辞書変数に保存
     global dict0, dict1, dictHoldFlag
     if dictHoldFlag:
         dict1 = dict0.copy()
@@ -128,7 +126,6 @@ def CheckDist(stats):
 
 # ******************************************************* カメラ起動の初期化
 cap = cv2.VideoCapture(0)  # 起動時はカメラ入力
-
 if not cap.isOpened():
     print('Camera is not connected, I cannot open it')
     import sys
@@ -175,7 +172,7 @@ while True:
     frmSub = cv2.subtract(frm01, frm001)
 #     storeDict('0.Acc01', frm01)
 #     storeDict('1.Acc001', frm001)
-#     storeDict('2.frmSub', frmSub)
+    storeDict('2.frmSub', frmSub)
 
 # 差分画像のノイズ除去
     gaus = cv2.GaussianBlur(frmSub, (3, 3), 0)
@@ -207,7 +204,6 @@ while True:
             writeDict()  # 中間画像ファイルを出力する
             dict0.clear()
             dict1.clear()
-#             dictFileDumpFlag = False
             PeakDetectedFlag = False
 
 # 柔らかいものがあると確定まで時間がかかる、2個以上領域が残る状態でも合計面積500以下なら検知完了とする
@@ -224,7 +220,6 @@ while True:
             writeDict()  # 蓄積済の中間画像ファイルを出力
             dict0.clear()
             dict1.clear()
-#             dictFileDumpFlag = False
             PeakDetectedFlag = False
 
 # 積算距離を用いた外れ値除外処理 (カゴ全体の振動を排除)、外れ値はSize=-1にセットされる
@@ -326,6 +321,7 @@ while True:
         vfile = tkinter.filedialog.askopenfilename(filetypes = fTyp,initialdir = iDir)
         print('動画ファイル名=', vfile)
         cap.release()
+        dictFileDumpFlag = True
         cap = cv2.VideoCapture(vfile)
         if not cap.isOpened():
             print('Video file has the problem!')
