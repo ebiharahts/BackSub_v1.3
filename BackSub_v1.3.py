@@ -35,10 +35,13 @@ M_MARGIN = 3
 dict0, dict1 = {}, {}
 # 何回目のファイル出力かを記録(出力ファイルの接頭ワードとして使う)
 outCt = 0
-# ファイルに出力するか否かを決めるフラグ
-dictFileDumpFlag = False  # Trueになったら1回分の物体検出経過を一式出力
 # dict0からdict1へのコピーを指示するワンショットフラグ
 dictHoldFlag = False  # 最大枠が更新される度にTrueになる
+
+# ファイルに出力するか否かを決めるフラグ、mp4読み込み時はTrue
+dictFileDumpFlag = True  # Trueになったら1回分の物体検出経過を一式出力
+# 外部読み込みファイル名、スタート時は空欄
+vfile = ''
 
 
 # sキー入力で記録
@@ -124,15 +127,17 @@ def CheckDist(stats):
 
 
 # ******************************************************* カメラ起動の初期化
-cap = cv2.VideoCapture(0)
+cap = cv2.VideoCapture(0)  # 起動時はカメラ入力
+
 if not cap.isOpened():
     print('Camera is not connected, I cannot open it')
     import sys
     sys.exit(1)
 
-print(cap.set(cv2.CAP_PROP_FPS, 2), end='')  # 2fpsにセット
+# VSCでは下記設定はエラーになる
+# print(cap.set(cv2.CAP_PROP_FPS, 2), end='')  # 2fpsにセット
 
-frame = cap.read()[1]
+ret, frame = cap.read()
 height, width = frame.shape[:2]
 print(' x=', width, ' y=', height)
 
@@ -146,7 +151,9 @@ MS_maxSize = width*height  # 起動時、画像が安定するまでエリア検
 # ************************************************************** main loop
 
 while True:
-    frame = cap.read()[1]
+    ret, frame = cap.read()
+    if not ret:
+        break
 
 # 平滑化
     blu = cv2.GaussianBlur(frame, (5, 5), 0)
@@ -304,10 +311,26 @@ while True:
     key = cv2.waitKey(1)
     if key & 0xFF == ord('q'):
         break
-    # sが押されたら1回分の物体検知の中間画像をファイルにダンプ
+    # sが押されたら物体検知の中間画像のファイルダンプを開始
     elif key & 0xFF == ord('s'):
         dictFileDumpFlag = True
         print('Image Store is started!')
+    elif key & 0xff == ord('f'):  # カメラ入力からファイル入力に切替
+        import os, tkinter, tkinter.filedialog, tkinter.messagebox
+        # ファイル選択ダイアログの表示
+        root = tkinter.Tk()
+        root.withdraw()
+        fTyp = [("","*")]
+        iDir = os.path.abspath(os.path.dirname(__file__))
+        # tkinter.messagebox.showinfo('動画入力','動画ファイルを選択してください！')
+        vfile = tkinter.filedialog.askopenfilename(filetypes = fTyp,initialdir = iDir)
+        print('動画ファイル名=', vfile)
+        cap.release()
+        cap = cv2.VideoCapture(vfile)
+        if not cap.isOpened():
+            print('Video file has the problem!')
+            import sys
+            sys.exit(1)
 
 cap.release()
 cv2.destroyAllWindows()
