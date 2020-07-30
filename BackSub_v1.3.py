@@ -11,8 +11,8 @@ import numpy as np
 
 # (定数) ------------------------------------------------------------
 # エッジ抽出
-CANNY_EXT = 180  # エッジ拡張の許容度
-CANNY_EDGE = 180  # エッジ判定のスレッショルド
+CANNY_EXT = 130  # エッジ拡張の許容度  180
+CANNY_EDGE = 130  # エッジ判定のスレッショルド  180
 # 短蓄、長蓄の合成比率
 ACCUM_RATE_01 = 0.1    # 短期蓄積比率
 ACCUM_RATE_001 = 0.04  # 長期蓄積比率
@@ -21,7 +21,7 @@ THRES_VAL_MIN = 40  # 2値化する際の最小値 ～255
 # 外れ値除去
 GS_VAL_MIN = 0.9  # GS値 = 標準偏差の何倍離れているか？
 # 有効な検出領域と判断する最小面積
-MIN_VALID_AREA_SIZE = 1500
+MIN_VALID_AREA_SIZE = 2500
 # 有効な物体検知とみなす領域数の最大値 (超える場合はカゴ全体の振動と判断)
 MAX_NAREA = 50
 # 検出領域の面積合計が下記以下になったら検知完了と判断(軟らかい物体対応)
@@ -229,6 +229,7 @@ while True:
     SS_maxSize = 0  # SingleShot(検出1回分の最大サイズ)
     frame2 = frame.copy()
     frame3 = frame.copy()
+    frame4 = frame.copy()
     if (2 <= nArea) & (nArea < MAX_NAREA):  # 正常な検知エリアの数は2個から25個まで
         for i in range(1, nArea):
             x, y, w, h, size = stats[i]
@@ -251,7 +252,7 @@ while True:
         cv2.imshow('7.Rect_RT', frame2)  # 画面観測用
         storeDict('7.Rect', frame2)
 
-# 面積最大領域に重複する領域を併合して外枠拡張 (ひとつになるはずの領域が分割されたケースを救済)
+# 面積最大領域に重複する領域を併合して外枠拡張 (1回目)
         # 元のサイズからスタート
         MinX2, MaxX2, MinY2, MaxY2 = MinX, MaxX, MinY, MaxY
         # 元の領域にマージンを付けて拡張、多少の隙間があっても重複と判断
@@ -291,6 +292,47 @@ while True:
         frame3 = cv2.rectangle(frame3, (MinX, MinY), (MaxX, MaxY),
                                (0, 255, 0), 1)  # 緑描画 最大サイズ
         storeDict('8.RectMerged', frame3)
+
+# 面積最大領域に重複する領域を併合して外枠拡張 (2回目)
+        # 元のサイズからスタート
+        MinX2, MaxX2, MinY2, MaxY2 = MinX, MaxX, MinY, MaxY
+        # 元の領域にマージンを付けて拡張、多少の隙間があっても重複と判断
+        MinX1, MaxX1, MinY1, MaxY1 = MinX-M_MARGIN, MaxX+M_MARGIN, MinY-M_MARGIN, MaxY+M_MARGIN
+        for i in range(1, nArea):
+            x, y, w, h, size = stats[i]
+            if size == -1:
+                frame4 = cv2.rectangle(frame4, (x, y), (x+w, y+h),
+                                       (0, 0, 255), 1)  # 赤描画 GS値で除去
+            else:
+                if (MinX1 <= x) & (x <= MaxX1) & (MinY1 <= y) & (y <= MaxY1):
+                    if MaxX2 < x+w:
+                        MaxX2 = x+w
+                    if MaxY2 < y+h:
+                        MaxY2 = y+h
+                if (MinX1 <= x+h) & (x+h <= MaxX1) & (MinY1 <= y) & (y <= MaxY1):
+                    if x < MinX2:
+                        MinX2 = x
+                    if MaxY2 < y+h:
+                        MaxY2 = y+h
+                if (MinX1 <= x) & (x <= MaxX1) & (MinY1 <= y+h) & (y+h <= MaxY1):
+                    if MaxX2 < x+w:
+                        MaxX2 = x+w
+                    if y < MinY2:
+                        MinY2 = y
+                if (MinX1 <= x+w) & (x+w <= MaxX1) & \
+                   (MinY1 <= y+h) & (y+h <= MaxY1):
+                    if x < MinX2:
+                        MinX2 = x
+                    if y < MinY2:
+                        MinY2 = y
+                frame4 = cv2.rectangle(frame4, (x, y), (x+w, y+h),
+                                       (255, 255, 255), 1)  # 白描画 通常の枠
+
+        MinX, MaxX, MinY, MaxY = MinX2, MaxX2, MinY2, MaxY2
+        SS_maxSize = (MaxX-MinX)*(MaxY-MinY)
+        frame4 = cv2.rectangle(frame4, (MinX, MinY), (MaxX, MaxY),
+                               (0, 255, 0), 1)  # 緑描画 最大サイズ
+        storeDict('9.RectMerged2', frame4)
 
 # 起動直後の検出結果をスキップ
     if MS_maxSize < SS_maxSize:  # 起動直後(検出1回目)は9999なので成立しない、不正画像抑制
