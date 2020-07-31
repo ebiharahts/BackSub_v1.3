@@ -3,7 +3,7 @@
 #  背景差分を用いた物体検知 BackSub_v1.3
 #    Copyright © 2020 Retail AI Lab,Inc.
 #
-#  大きい領域抽出後の拡大処理機能を強化できるか検討
+#       探索型領域拡張方式に変更 (2020.07.31)
 ###############################################################
 
 import cv2
@@ -26,8 +26,8 @@ MIN_VALID_AREA_SIZE = 2500
 MAX_NAREA = 50
 # 検出領域の面積合計が下記以下になったら検知完了と判断(軟らかい物体対応)
 MIN_AREA_SIZE = 500
-# マージ時のマージン (領域を広げて接触判定)
-M_MARGIN = 10
+# 探索型拡張時のマージン (注目領域を広げて接触判定)
+A_MARGIN = 10
 # (定数) ------------------------------------------------------------
 
 # 出力画像データを保管しておく辞書型変数
@@ -37,12 +37,13 @@ dict0, dict1 = {}, {}
 outCt = 0
 # dict0からdict1へのコピーを指示するワンショットフラグ
 dictHoldFlag = False  # 最大枠が更新される度にTrueになる
-
 # ファイル出力を行うか否かを決めるフラグ、's'または'f'でダンプ開始
 dictFileDumpFlag = False  # Trueになったら中間画像ファイルをダンプ
+# ファイル入力切替フラグ
+fileInputFlag = False
 
 
-# sキー入力で中間画像を記録
+# 中間画像を上書き記録
 def storeDict(name, img):  # 画像を辞書変数に保存
     global dict0, dict1, dictHoldFlag
     if dictHoldFlag:
@@ -52,7 +53,7 @@ def storeDict(name, img):  # 画像を辞書変数に保存
     return
 
 
-# 中間画像を出力、ウィンドウ表示、ファイルダンプ(出力回数を頭に付けてファイル出力)
+# dictに溜まった画像をウィンドウ表示、ファイルダンプ(出力回数を頭に付けてファイル出力)
 def writeDict():
     global dict1, outCt, dictFileDumpFlag
 
@@ -124,7 +125,7 @@ def CheckDist(stats):
     return stats2
 
 
-# 指定された領域の周囲に併合出来る領域があるかチェック
+# 領域拡張処理: 指定領域の周囲に併合出来る領域があるかチェック
 def AreaExpandSearch(stats, idx, mergin, validAreaList):
     x, y, w, h, size = stats[idx]
     # 元の領域にマージンを付けて拡張、多少の隙間があっても併合対象と判断
@@ -147,7 +148,7 @@ def AreaExpandSearch(stats, idx, mergin, validAreaList):
                 AreaExpandSearch(stats, i, mergin, validAreaList)
     return
 
-
+# リストに蓄積された対象領域を包む外枠を決定
 def OuterFrame(stats, validAreaList):
     global width, height, frame
     MinX, MaxX, MinY, MaxY = width, 0, height, 0
@@ -251,6 +252,8 @@ while True:
             dict0.clear()
             dict1.clear()
             PeakDetectedFlag = False
+            if fileInputFlag:  # ファイル入力時はキー入力を待って次に進む
+                cv2.waitKey(0)
 
 # 柔らかいものがあると確定まで時間がかかる、2個以上領域が残る状態でも合計面積500以下なら検知完了とする
     elif (2 <= nArea) & (nArea < MAX_NAREA):
@@ -267,6 +270,8 @@ while True:
             dict0.clear()
             dict1.clear()
             PeakDetectedFlag = False
+            if fileInputFlag:  # ファイル入力時はキー入力を待って次に進む
+                cv2.waitKey(0)            
 
 # 積算距離を用いた外れ値除外処理 (カゴ全体の振動を排除)、外れ値はSize=-1にセットされる
     stats = CheckDist(stats)
@@ -274,8 +279,6 @@ while True:
 # 検出領域の中で最大サイズの領域を抽出
     SS_maxSize = 0  # SingleShot(検出1回分の最大サイズ)
     frame2 = frame.copy()
-    frame3 = frame.copy()
-    frame4 = frame.copy()
     if (2 <= nArea) & (nArea < MAX_NAREA):  # 正常な検知エリアの数は2個から25個まで
         for i in range(1, nArea):
             x, y, w, h, size = stats[i]
@@ -299,9 +302,9 @@ while True:
         cv2.imshow('7.Rect_RT', frame2)  # 画面観測用
         storeDict('7.Rect', frame2)
 
-# 近接領域を併合する処理
+# 領域拡張処理 (注目領域をマージン分広げて近接領域を併合)
         validAreaList = [MAXidx]
-        AreaExpandSearch(stats, MAXidx, M_MARGIN, validAreaList)
+        AreaExpandSearch(stats, MAXidx, A_MARGIN, validAreaList)
         # print('validAreaList=', validAreaList)
         MinX, MaxX, MinY, MaxY = OuterFrame(stats, validAreaList)
         SS_maxSize = (MaxX-MinX)*(MaxY-MinY)   
@@ -325,6 +328,7 @@ while True:
         dictFileDumpFlag = True
         print('Image Store is started!')
     elif key & 0xff == ord('f'):  # カメラ入力からファイル入力に切替
+        fileInputFlag = True
         import os, tkinter, tkinter.filedialog, tkinter.messagebox
         # ファイル選択ダイアログの表示
         root = tkinter.Tk()
@@ -334,8 +338,9 @@ while True:
         # tkinter.messagebox.showinfo('動画入力','動画ファイルを選択してください！')
         vfile = tkinter.filedialog.askopenfilename(filetypes = fTyp,initialdir = iDir)
         print('動画ファイル名=', vfile)
+        print('Step execution ⇒  Push any key!')
         cap.release()
-        dictFileDumpFlag = True
+        # dictFileDumpFlag = True
         cap = cv2.VideoCapture(vfile)
         if not cap.isOpened():
             print('Video file has the problem!')
