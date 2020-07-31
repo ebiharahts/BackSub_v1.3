@@ -1,9 +1,14 @@
 
 ###############################################################
 #  背景差分を用いた物体検知 BackSub_v1.3
-#    Copyright © 2020 Retail AI Lab,Inc.
+#    Copyright 2020 Retail AI X,Inc.
+#    探索型領域拡張方式に変更 (2020.07.31)
 #
-#       探索型領域拡張方式に変更 (2020.07.31)
+# ◇使い方 (画面上でキー入力)
+#  q = quit/終了
+#  s = 処理結果をファイルにセーブ
+#  f = カメラ入力から動画ファイル入力に切替(ファイル選択画面)
+#
 ###############################################################
 
 import cv2
@@ -53,7 +58,7 @@ def storeDict(name, img):  # 画像を辞書変数に保存
     return
 
 
-# dictに溜まった画像をウィンドウ表示、ファイルダンプ(出力回数を頭に付けてファイル出力)
+# dictに溜まった画像をウィンドウ表示、ファイルセーブ(出力回数を頭に付けてファイル出力)
 def writeDict():
     global dict1, outCt, dictFileDumpFlag
 
@@ -134,18 +139,12 @@ def AreaExpandSearch(stats, idx, mergin, validAreaList):
     for i in range(1, len(stats)):
         x, y, w, h, size = stats[i]
         if (size != -1) & (i != idx) & (i not in validAreaList):
-            if (MinX <= x) & (x <= MaxX) & (MinY <= y) & (y <= MaxY):
-                validAreaList.append(i)
-                AreaExpandSearch(stats, i, mergin, validAreaList)
-            elif (MinX <= x+w) & (x+w <= MaxX) & (MinY <= y) & (y <= MaxY):
-                validAreaList.append(i)
-                AreaExpandSearch(stats, i, mergin, validAreaList)
-            elif (MinX <= x) & (x <= MaxX) & (MinY <= y+h) & (y+h <= MaxY):
-                validAreaList.append(i)
-                AreaExpandSearch(stats, i, mergin, validAreaList)
-            elif (MinX <= x+w) & (x+w <= MaxX) & (MinY <= y+h) & (y+h <= MaxY):
-                validAreaList.append(i)
-                AreaExpandSearch(stats, i, mergin, validAreaList)
+            if (MinX <= x) & (x <= MaxX) & (MinY <= y) & (y <= MaxY) or \
+                (MinX <= x+w) & (x+w <= MaxX) & (MinY <= y) & (y <= MaxY) or \
+                (MinX <= x) & (x <= MaxX) & (MinY <= y+h) & (y+h <= MaxY) or \
+                (MinX <= x+w) & (x+w <= MaxX) & (MinY <= y+h) & (y+h <= MaxY):
+                    validAreaList.append(i)
+                    AreaExpandSearch(stats, i, mergin, validAreaList)
     return
 
 # リストに蓄積された対象領域を包む外枠を決定
