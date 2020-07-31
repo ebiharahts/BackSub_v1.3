@@ -252,87 +252,98 @@ while True:
         cv2.imshow('7.Rect_RT', frame2)  # 画面観測用
         storeDict('7.Rect', frame2)
 
-# 面積最大領域に重複する領域を併合して外枠拡張 (1回目)
-        # 元のサイズからスタート
-        MinX2, MaxX2, MinY2, MaxY2 = MinX, MaxX, MinY, MaxY
-        # 元の領域にマージンを付けて拡張、多少の隙間があっても重複と判断
-        MinX1, MaxX1, MinY1, MaxY1 = MinX-M_MARGIN, MaxX+M_MARGIN, MinY-M_MARGIN, MaxY+M_MARGIN
-        for i in range(1, nArea):
-            x, y, w, h, size = stats[i]
-            if size == -1:
-                frame3 = cv2.rectangle(frame3, (x, y), (x+w, y+h),
-                                       (0, 0, 255), 1)  # 赤描画 GS値で除去
-            else:
-                if (MinX1 <= x) & (x <= MaxX1) & (MinY1 <= y) & (y <= MaxY1):
-                    if MaxX2 < x+w:
-                        MaxX2 = x+w
-                    if MaxY2 < y+h:
-                        MaxY2 = y+h
-                if (MinX1 <= x+h) & (x+h <= MaxX1) & (MinY1 <= y) & (y <= MaxY1):
-                    if x < MinX2:
-                        MinX2 = x
-                    if MaxY2 < y+h:
-                        MaxY2 = y+h
-                if (MinX1 <= x) & (x <= MaxX1) & (MinY1 <= y+h) & (y+h <= MaxY1):
-                    if MaxX2 < x+w:
-                        MaxX2 = x+w
-                    if y < MinY2:
-                        MinY2 = y
-                if (MinX1 <= x+w) & (x+w <= MaxX1) & \
-                   (MinY1 <= y+h) & (y+h <= MaxY1):
-                    if x < MinX2:
-                        MinX2 = x
-                    if y < MinY2:
-                        MinY2 = y
-                frame3 = cv2.rectangle(frame3, (x, y), (x+w, y+h),
-                                       (255, 255, 255), 1)  # 白描画 通常の枠
+        # 面積最大領域に重複する領域を併合して外枠拡張 (拡張できなくなるまで何回も拡張)
+        expandFlag = True
+        while (expandFlag):
+            # 元のサイズからスタート
+            MinX2, MaxX2, MinY2, MaxY2 = MinX, MaxX, MinY, MaxY
+            # 元の領域にマージンを付けて拡張、多少の隙間があっても重複と判断
+            MinX1, MaxX1, MinY1, MaxY1 = MinX-M_MARGIN, MaxX+M_MARGIN, MinY-M_MARGIN, MaxY+M_MARGIN
+            expandFlag = False
+            for i in range(1, nArea):
+                x, y, w, h, size = stats[i]
+                if size == -1:
+                    frame3 = cv2.rectangle(frame3, (x, y), (x+w, y+h),
+                                        (0, 0, 255), 1)  # 赤描画 GS値で除去
+                else:
+                    if (MinX1 <= x) & (x <= MaxX1) & (MinY1 <= y) & (y <= MaxY1):
+                        if MaxX2 < x+w:
+                            MaxX2 = x+w
+                            expandFlag = True
+                        if MaxY2 < y+h:
+                            MaxY2 = y+h
+                            expandFlag = True
+                    if (MinX1 <= x+h) & (x+h <= MaxX1) & (MinY1 <= y) & (y <= MaxY1):
+                        if x < MinX2:
+                            MinX2 = x
+                            expandFlag = True
+                        if MaxY2 < y+h:
+                            MaxY2 = y+h
+                            expandFlag = True
+                    if (MinX1 <= x) & (x <= MaxX1) & (MinY1 <= y+h) & (y+h <= MaxY1):
+                        if MaxX2 < x+w:
+                            MaxX2 = x+w
+                            expandFlag = True
+                        if y < MinY2:
+                            MinY2 = y
+                            expandFlag = True
+                    if (MinX1 <= x+w) & (x+w <= MaxX1) & \
+                    (MinY1 <= y+h) & (y+h <= MaxY1):
+                        if x < MinX2:
+                            MinX2 = x
+                            expandFlag = True
+                        if y < MinY2:
+                            MinY2 = y
+                            expandFlag = True
+                    frame3 = cv2.rectangle(frame3, (x, y), (x+w, y+h),
+                                        (255, 255, 255), 1)  # 白描画 通常の枠
 
-        MinX, MaxX, MinY, MaxY = MinX2, MaxX2, MinY2, MaxY2
-        SS_maxSize = (MaxX-MinX)*(MaxY-MinY)
-        frame3 = cv2.rectangle(frame3, (MinX, MinY), (MaxX, MaxY),
-                               (0, 255, 0), 1)  # 緑描画 最大サイズ
-        storeDict('8.RectMerged', frame3)
+            MinX, MaxX, MinY, MaxY = MinX2, MaxX2, MinY2, MaxY2
+            SS_maxSize = (MaxX-MinX)*(MaxY-MinY)
+            frame3 = cv2.rectangle(frame3, (MinX, MinY), (MaxX, MaxY),
+                                (0, 255, 0), 1)  # 緑描画 最大サイズ
+            storeDict('8.RectMerged', frame3)
 
-# 面積最大領域に重複する領域を併合して外枠拡張 (2回目)
-        # 元のサイズからスタート
-        MinX2, MaxX2, MinY2, MaxY2 = MinX, MaxX, MinY, MaxY
-        # 元の領域にマージンを付けて拡張、多少の隙間があっても重複と判断
-        MinX1, MaxX1, MinY1, MaxY1 = MinX-M_MARGIN, MaxX+M_MARGIN, MinY-M_MARGIN, MaxY+M_MARGIN
-        for i in range(1, nArea):
-            x, y, w, h, size = stats[i]
-            if size == -1:
-                frame4 = cv2.rectangle(frame4, (x, y), (x+w, y+h),
-                                       (0, 0, 255), 1)  # 赤描画 GS値で除去
-            else:
-                if (MinX1 <= x) & (x <= MaxX1) & (MinY1 <= y) & (y <= MaxY1):
-                    if MaxX2 < x+w:
-                        MaxX2 = x+w
-                    if MaxY2 < y+h:
-                        MaxY2 = y+h
-                if (MinX1 <= x+h) & (x+h <= MaxX1) & (MinY1 <= y) & (y <= MaxY1):
-                    if x < MinX2:
-                        MinX2 = x
-                    if MaxY2 < y+h:
-                        MaxY2 = y+h
-                if (MinX1 <= x) & (x <= MaxX1) & (MinY1 <= y+h) & (y+h <= MaxY1):
-                    if MaxX2 < x+w:
-                        MaxX2 = x+w
-                    if y < MinY2:
-                        MinY2 = y
-                if (MinX1 <= x+w) & (x+w <= MaxX1) & \
-                   (MinY1 <= y+h) & (y+h <= MaxY1):
-                    if x < MinX2:
-                        MinX2 = x
-                    if y < MinY2:
-                        MinY2 = y
-                frame4 = cv2.rectangle(frame4, (x, y), (x+w, y+h),
-                                       (255, 255, 255), 1)  # 白描画 通常の枠
+# # 面積最大領域に重複する領域を併合して外枠拡張 (2回目)
+#         # 元のサイズからスタート
+#         MinX2, MaxX2, MinY2, MaxY2 = MinX, MaxX, MinY, MaxY
+#         # 元の領域にマージンを付けて拡張、多少の隙間があっても重複と判断
+#         MinX1, MaxX1, MinY1, MaxY1 = MinX-M_MARGIN, MaxX+M_MARGIN, MinY-M_MARGIN, MaxY+M_MARGIN
+#         for i in range(1, nArea):
+#             x, y, w, h, size = stats[i]
+#             if size == -1:
+#                 frame4 = cv2.rectangle(frame4, (x, y), (x+w, y+h),
+#                                        (0, 0, 255), 1)  # 赤描画 GS値で除去
+#             else:
+#                 if (MinX1 <= x) & (x <= MaxX1) & (MinY1 <= y) & (y <= MaxY1):
+#                     if MaxX2 < x+w:
+#                         MaxX2 = x+w
+#                     if MaxY2 < y+h:
+#                         MaxY2 = y+h
+#                 if (MinX1 <= x+h) & (x+h <= MaxX1) & (MinY1 <= y) & (y <= MaxY1):
+#                     if x < MinX2:
+#                         MinX2 = x
+#                     if MaxY2 < y+h:
+#                         MaxY2 = y+h
+#                 if (MinX1 <= x) & (x <= MaxX1) & (MinY1 <= y+h) & (y+h <= MaxY1):
+#                     if MaxX2 < x+w:
+#                         MaxX2 = x+w
+#                     if y < MinY2:
+#                         MinY2 = y
+#                 if (MinX1 <= x+w) & (x+w <= MaxX1) & \
+#                    (MinY1 <= y+h) & (y+h <= MaxY1):
+#                     if x < MinX2:
+#                         MinX2 = x
+#                     if y < MinY2:
+#                         MinY2 = y
+#                 frame4 = cv2.rectangle(frame4, (x, y), (x+w, y+h),
+#                                        (255, 255, 255), 1)  # 白描画 通常の枠
 
-        MinX, MaxX, MinY, MaxY = MinX2, MaxX2, MinY2, MaxY2
-        SS_maxSize = (MaxX-MinX)*(MaxY-MinY)
-        frame4 = cv2.rectangle(frame4, (MinX, MinY), (MaxX, MaxY),
-                               (0, 255, 0), 1)  # 緑描画 最大サイズ
-        storeDict('9.RectMerged2', frame4)
+#         MinX, MaxX, MinY, MaxY = MinX2, MaxX2, MinY2, MaxY2
+#         SS_maxSize = (MaxX-MinX)*(MaxY-MinY)
+#         frame4 = cv2.rectangle(frame4, (MinX, MinY), (MaxX, MaxY),
+#                                (0, 255, 0), 1)  # 緑描画 最大サイズ
+#         storeDict('9.RectMerged2', frame4)
 
 # 起動直後の検出結果をスキップ
     if MS_maxSize < SS_maxSize:  # 起動直後(検出1回目)は9999なので成立しない、不正画像抑制
