@@ -124,6 +124,52 @@ def CheckDist(stats):
     return stats2
 
 
+# 指定された領域の周囲に併合出来る領域があるかチェック
+def AreaExpandSearch(stats, idx, mergin, validAreaList):
+    x, y, w, h, size = stats[idx]
+    # 元の領域にマージンを付けて拡張、多少の隙間があっても併合対象と判断
+    MinX, MaxX, MinY, MaxY = x-mergin, x+w+mergin, y-mergin, y+h+mergin
+
+    for i in range(1, len(stats)):
+        x, y, w, h, size = stats[i]
+        if (size != -1) & (i != idx) & (i not in validAreaList):
+            if (MinX <= x) & (x <= MaxX) & (MinY <= y) & (y <= MaxY):
+                validAreaList.append(i)
+                AreaExpandSearch(stats, i, mergin, validAreaList)
+            elif (MinX <= x+w) & (x+w <= MaxX) & (MinY <= y) & (y <= MaxY):
+                validAreaList.append(i)
+                AreaExpandSearch(stats, i, mergin, validAreaList)
+            elif (MinX <= x) & (x <= MaxX) & (MinY <= y+h) & (y+h <= MaxY):
+                validAreaList.append(i)
+                AreaExpandSearch(stats, i, mergin, validAreaList)
+            elif (MinX <= x+w) & (x+w <= MaxX) & (MinY <= y+h) & (y+h <= MaxY):
+                validAreaList.append(i)
+                AreaExpandSearch(stats, i, mergin, validAreaList)
+    return
+
+
+def OuterFrame(stats, validAreaList):
+    global width, height, frame
+    MinX, MaxX, MinY, MaxY = width, 0, height, 0
+    frameOF = frame.copy()
+
+    for i in validAreaList:
+        x, y, w, h, size = stats[i]
+        if x < MinX:
+            MinX = x
+        if MaxX < x+w:
+            MaxX = x+w
+        if y < MinY:
+            MinY = y
+        if MaxY < y+h:
+            MaxY = y+h
+        frameOF = cv2.rectangle(frameOF, (x, y), (x+w, y+h), (0, 255, 0), 1)  # 緑描画 最大サイズ
+
+    storeDict('8.ExpandedArea', frameOF)     
+
+    return(MinX, MaxX, MinY, MaxY)
+
+
 # ******************************************************* カメラ起動の初期化
 cap = cv2.VideoCapture(0)  # 起動時はカメラ入力
 if not cap.isOpened():
@@ -131,7 +177,7 @@ if not cap.isOpened():
     import sys
     sys.exit(1)
 
-# VSCでは下記設定はエラーになる
+# VScodeでは下記設定はエラーになる
 # print(cap.set(cv2.CAP_PROP_FPS, 2), end='')  # 2fpsにセット
 
 ret, frame = cap.read()
@@ -172,7 +218,7 @@ while True:
     frmSub = cv2.subtract(frm01, frm001)
 #     storeDict('0.Acc01', frm01)
 #     storeDict('1.Acc001', frm001)
-    storeDict('2.frmSub', frmSub)
+#     storeDict('2.frmSub', frmSub)
 
 # 差分画像のノイズ除去
     gaus = cv2.GaussianBlur(frmSub, (3, 3), 0)
@@ -245,6 +291,7 @@ while True:
                     MaxX = x+w
                     MinY = y
                     MaxY = y+h
+                    MAXidx = i
 
     if 0 < SS_maxSize:  # 1個以上の有効データが存在、全て外れ値だと成立しない
         frame2 = cv2.rectangle(frame2, (MinX, MinY), (MaxX, MaxY),
@@ -252,98 +299,12 @@ while True:
         cv2.imshow('7.Rect_RT', frame2)  # 画面観測用
         storeDict('7.Rect', frame2)
 
-        # 面積最大領域に重複する領域を併合して外枠拡張 (拡張できなくなるまで何回も拡張)
-        expandFlag = True
-        while (expandFlag):
-            # 元のサイズからスタート
-            MinX2, MaxX2, MinY2, MaxY2 = MinX, MaxX, MinY, MaxY
-            # 元の領域にマージンを付けて拡張、多少の隙間があっても重複と判断
-            MinX1, MaxX1, MinY1, MaxY1 = MinX-M_MARGIN, MaxX+M_MARGIN, MinY-M_MARGIN, MaxY+M_MARGIN
-            expandFlag = False
-            for i in range(1, nArea):
-                x, y, w, h, size = stats[i]
-                if size == -1:
-                    frame3 = cv2.rectangle(frame3, (x, y), (x+w, y+h),
-                                        (0, 0, 255), 1)  # 赤描画 GS値で除去
-                else:
-                    if (MinX1 <= x) & (x <= MaxX1) & (MinY1 <= y) & (y <= MaxY1):
-                        if MaxX2 < x+w:
-                            MaxX2 = x+w
-                            expandFlag = True
-                        if MaxY2 < y+h:
-                            MaxY2 = y+h
-                            expandFlag = True
-                    if (MinX1 <= x+h) & (x+h <= MaxX1) & (MinY1 <= y) & (y <= MaxY1):
-                        if x < MinX2:
-                            MinX2 = x
-                            expandFlag = True
-                        if MaxY2 < y+h:
-                            MaxY2 = y+h
-                            expandFlag = True
-                    if (MinX1 <= x) & (x <= MaxX1) & (MinY1 <= y+h) & (y+h <= MaxY1):
-                        if MaxX2 < x+w:
-                            MaxX2 = x+w
-                            expandFlag = True
-                        if y < MinY2:
-                            MinY2 = y
-                            expandFlag = True
-                    if (MinX1 <= x+w) & (x+w <= MaxX1) & \
-                    (MinY1 <= y+h) & (y+h <= MaxY1):
-                        if x < MinX2:
-                            MinX2 = x
-                            expandFlag = True
-                        if y < MinY2:
-                            MinY2 = y
-                            expandFlag = True
-                    frame3 = cv2.rectangle(frame3, (x, y), (x+w, y+h),
-                                        (255, 255, 255), 1)  # 白描画 通常の枠
-
-            MinX, MaxX, MinY, MaxY = MinX2, MaxX2, MinY2, MaxY2
-            SS_maxSize = (MaxX-MinX)*(MaxY-MinY)
-            frame3 = cv2.rectangle(frame3, (MinX, MinY), (MaxX, MaxY),
-                                (0, 255, 0), 1)  # 緑描画 最大サイズ
-            storeDict('8.RectMerged', frame3)
-
-# # 面積最大領域に重複する領域を併合して外枠拡張 (2回目)
-#         # 元のサイズからスタート
-#         MinX2, MaxX2, MinY2, MaxY2 = MinX, MaxX, MinY, MaxY
-#         # 元の領域にマージンを付けて拡張、多少の隙間があっても重複と判断
-#         MinX1, MaxX1, MinY1, MaxY1 = MinX-M_MARGIN, MaxX+M_MARGIN, MinY-M_MARGIN, MaxY+M_MARGIN
-#         for i in range(1, nArea):
-#             x, y, w, h, size = stats[i]
-#             if size == -1:
-#                 frame4 = cv2.rectangle(frame4, (x, y), (x+w, y+h),
-#                                        (0, 0, 255), 1)  # 赤描画 GS値で除去
-#             else:
-#                 if (MinX1 <= x) & (x <= MaxX1) & (MinY1 <= y) & (y <= MaxY1):
-#                     if MaxX2 < x+w:
-#                         MaxX2 = x+w
-#                     if MaxY2 < y+h:
-#                         MaxY2 = y+h
-#                 if (MinX1 <= x+h) & (x+h <= MaxX1) & (MinY1 <= y) & (y <= MaxY1):
-#                     if x < MinX2:
-#                         MinX2 = x
-#                     if MaxY2 < y+h:
-#                         MaxY2 = y+h
-#                 if (MinX1 <= x) & (x <= MaxX1) & (MinY1 <= y+h) & (y+h <= MaxY1):
-#                     if MaxX2 < x+w:
-#                         MaxX2 = x+w
-#                     if y < MinY2:
-#                         MinY2 = y
-#                 if (MinX1 <= x+w) & (x+w <= MaxX1) & \
-#                    (MinY1 <= y+h) & (y+h <= MaxY1):
-#                     if x < MinX2:
-#                         MinX2 = x
-#                     if y < MinY2:
-#                         MinY2 = y
-#                 frame4 = cv2.rectangle(frame4, (x, y), (x+w, y+h),
-#                                        (255, 255, 255), 1)  # 白描画 通常の枠
-
-#         MinX, MaxX, MinY, MaxY = MinX2, MaxX2, MinY2, MaxY2
-#         SS_maxSize = (MaxX-MinX)*(MaxY-MinY)
-#         frame4 = cv2.rectangle(frame4, (MinX, MinY), (MaxX, MaxY),
-#                                (0, 255, 0), 1)  # 緑描画 最大サイズ
-#         storeDict('9.RectMerged2', frame4)
+# 近接領域を併合する処理
+        validAreaList = [MAXidx]
+        AreaExpandSearch(stats, MAXidx, M_MARGIN, validAreaList)
+        # print('validAreaList=', validAreaList)
+        MinX, MaxX, MinY, MaxY = OuterFrame(stats, validAreaList)
+        SS_maxSize = (MaxX-MinX)*(MaxY-MinY)   
 
 # 起動直後の検出結果をスキップ
     if MS_maxSize < SS_maxSize:  # 起動直後(検出1回目)は9999なので成立しない、不正画像抑制
@@ -351,7 +312,7 @@ while True:
         if MIN_VALID_AREA_SIZE < MS_maxSize:  # 小さ過ぎる場合は描画しない(検出完了としない)
             frame5 = cv2.rectangle(frame, (MinX, MinY), (MaxX, MaxY),
                                    (0, 255, 255), 2)  # 黄描画
-            storeDict('10.Detected', frame5)
+            storeDict('9.Detected', frame5)
             PeakDetectedFlag = True  # 検出完了フラグ
             dictHoldFlag = True  # 辞書ファイルのスナップショットを作成
 
