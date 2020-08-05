@@ -171,7 +171,7 @@ def OuterFrame(stats, validAreaList):
 
 
 # ******************************************************* カメラ起動の初期化
-cap = cv2.VideoCapture(0)  # 起動時はカメラ入力
+cap = cv2.VideoCapture(1)  # 起動時はカメラ入力
 if not cap.isOpened():
     print('Camera is not connected, I cannot open it')
     import sys
@@ -216,9 +216,9 @@ while True:
     frm01 = cv2.convertScaleAbs(frmAcc01)
     frm001 = cv2.convertScaleAbs(frmAcc001)
     frmSub = cv2.subtract(frm01, frm001)
-#     storeDict('0.Acc01', frm01)
-#     storeDict('1.Acc001', frm001)
-#     storeDict('2.frmSub', frmSub)
+    storeDict('0.Acc01', frm01)
+    storeDict('1.Acc001', frm001)
+    storeDict('2.frmSub', frmSub)
 
 # 差分画像のノイズ除去
     gaus = cv2.GaussianBlur(frmSub, (3, 3), 0)
@@ -226,7 +226,7 @@ while True:
 
 # 2値化
     thres = cv2.threshold(gaus, THRES_VAL_MIN, 255, cv2.THRESH_BINARY)[1]
-#     storeDict('4.thres', thres)
+    # storeDict('4.thres', thres)
 
 # クロージング/穴埋め処理 (膨張後、縮小)
     kernel = np.ones((5, 5), np.uint8)
@@ -326,6 +326,15 @@ while True:
     elif key & 0xFF == ord('s'):
         dictFileDumpFlag = True
         print('Image Store is started!')
+        # storeDict('Back', frame)
+    elif key & 0xFF == ord('1'):
+        print('1 shot image stored!')
+        storeDict('99.Shot', frame)
+        dictHoldFlag = True
+        storeDict('99.Shot', frame)
+        writeDict()  # 中間画像ファイルを出力する
+        dict0.clear()
+        dict1.clear()
     elif key & 0xff == ord('f'):  # カメラ入力からファイル入力に切替
         fileInputFlag = True
         import os, tkinter, tkinter.filedialog, tkinter.messagebox
